@@ -1,31 +1,21 @@
-using System;
-using System.Collections.Generic;
+using MyDrone;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 public class DroneMovment : MonoBehaviour
 {
-    private Rigidbody _rb;
+    [SerializeField, Range(50f, 400f)] private float power = 120f;
+    [SerializeField] private RatePreset ratePreset;
 
-    [SerializeField] private List<GameObject> propellers;
-
-    private Controls _controls;
-    private Vector2 _leftStickVector;
-    private Vector2 _rifgtStickVector;
+    private Vector2 LeftStickVector => _controls.Main.LeftStick.ReadValue<Vector2>();
+    private Vector2 RightStickVector => _controls.Main.RightStick.ReadValue<Vector2>();
     
-    private float _targetAngleY; // Целевой угол наклона
-    private float _currentAngleY; // Текущий угол наклона
+    private Rigidbody _rb;
+    private Controls _controls;
 
     private void Awake()
     {
-        _controls = new Controls();
-        _controls.Main.LeftStick.performed += ctx => _leftStickVector = ctx.ReadValue<Vector2>();
-        _controls.Main.LeftStick.canceled += ctx => _leftStickVector = Vector2.zero;
-
-        _controls.Main.RightStick.performed += ctx => _rifgtStickVector = ctx.ReadValue<Vector2>();
-        _controls.Main.RightStick.canceled += ctx => _rifgtStickVector = Vector2.zero;
-
         _rb = GetComponent<Rigidbody>();
+        _controls = new Controls();
     }
 
     private void OnEnable()
@@ -40,102 +30,57 @@ public class DroneMovment : MonoBehaviour
 
     private void FixedUpdate()
     {
-        Movment();
+        var up = transform.up;
+        var forward = transform.forward;
+        var right = transform.right;
+        
+        var throttle = (LeftStickVector.y + 1f) / 2f;
+        var yaw = LeftStickVector.x;
+        var pitch = RightStickVector.y;
+        var roll = -RightStickVector.x;
+
+        var rcPitch = RateCalculation(pitch, ratePreset.pitchRcRate, ratePreset.pitchSuperRate, ratePreset.pitchExpo);
+        var rcYaw = RateCalculation(yaw, ratePreset.yawRcRate, ratePreset.yawSuperRate, ratePreset.yawExpo);
+        var rcRoll = RateCalculation(roll, ratePreset.rollRcRate, ratePreset.rollSuperRate, ratePreset.rollExpo);
+
+        _rb.angularVelocity -= _rb.angularVelocity / 2f;
+
+        var throttleMult = throttle * power;
+        
+        _rb.AddForce(up * (throttle * throttleMult));
+        _rb.AddTorque(forward * rcRoll / 100f);
+        _rb.AddTorque(right * rcPitch / 100f);
+        _rb.AddTorque(up * rcYaw / 100f);
     }
 
-    private void Movment()
+    /**
+     * Rate calculaton based on BetaFlight formula
+     * @link https://github.com/betaflight/betaflight
+     */ 
+    private float RateCalculation(float rcCommand, float rcRate, float superRate, float expo)
     {
-        MoveUpDown();
-        MoveForward();
-        MoveLeftRight();
-        MoveRotation();
-    }
+        
+        var absRcCommand = Mathf.Abs(rcCommand);
 
-    private void MoveUpDown()
-    {
-        float speed = 40f;
-        float speedInput = speed * _leftStickVector.y;
-
-        float soaring = 24.6f; //парение в воздухе
-        EngionTraction(new List<float>() { soaring, soaring, soaring, soaring });
-
-        if (_leftStickVector.y >= 0)
+        if (rcRate > 2.0f)
         {
-            EngionTraction(new List<float>() { speedInput, speedInput, speedInput, speedInput });
-        }
-        else
-        {
-            EngionTraction(new List<float>() { 0, 0, 0, 0 });
-        }
-    }
-
-    private void MoveForward()
-    {
-        //speed propeller
-        float speed = 40f;
-        float speedPropeller = speed * _rifgtStickVector.y;
-
-        //speed secondary propeller
-        float ratio = 0.90f;
-        float speedPropellerSecondary = speedPropeller * ratio;
-
-        //forward
-        if (_rifgtStickVector.y >= 0)
-        {
-            EngionTraction(new List<float>()
-                { speedPropeller, speedPropeller, speedPropellerSecondary, speedPropellerSecondary });
+            rcRate += 14.54f * (rcRate - 2.0f);
         }
 
-        //backward
-        if (_rifgtStickVector.y <= 0)
+        if (expo != 0)
         {
-            EngionTraction(new List<float>()
-                { -speedPropellerSecondary, -speedPropellerSecondary, -speedPropeller, -speedPropeller });
-        }
-    }
-
-    private void MoveLeftRight()
-    {
-        //speed propeller
-        float speed = 40f;
-        float speedPropeller = speed * _rifgtStickVector.x;
-
-        //speed secondary propeller
-        float ratio = 0.90f;
-        float speedPropellerSecondary = speedPropeller * ratio;
-
-        //forward
-        if (_rifgtStickVector.x >= 0)
-        {
-            EngionTraction(new List<float>()
-                { speedPropellerSecondary, speedPropeller, speedPropellerSecondary, speedPropeller });
+            rcCommand = rcCommand * Mathf.Abs(rcCommand) * 3f * expo + rcCommand * (1.0f - expo);
         }
 
-        //backward
-        if (_rifgtStickVector.x <= 0)
+        var angleRate = (200f * rcRate * rcCommand);
+
+        if (superRate != 0)
         {
-            EngionTraction(new List<float>()
-                { -speedPropeller, -speedPropellerSecondary, -speedPropeller, -speedPropellerSecondary });
+            var rcSuperFactor = 1.0f / Mathf.Clamp(1.0f - absRcCommand * (superRate), 0.01f, 1.00f);
+
+            angleRate *= rcSuperFactor;
         }
-    }
 
-    private void MoveRotation()
-    {
-        _rb.AddTorque(transform.up * _leftStickVector.x);
-    }
-
-    private void EngionTraction(List<float> engine)
-    {
-        for (int i = 0; i < propellers.Count; i++)
-        {
-            Vector3 propellerPosition = propellers[i].transform.position;
-            //calculate force direction 
-            Vector3 propellersBottomPoints = propellers[i].transform.Find("BottomPoint").transform.position;
-            Vector3 forceDirection = new Vector3(propellerPosition.x - propellersBottomPoints.x,
-                propellerPosition.y - propellersBottomPoints.y,
-                propellerPosition.z - propellersBottomPoints.z);
-
-            _rb.AddForceAtPosition(forceDirection.normalized * engine[i], propellerPosition);
-        }
+        return angleRate;
     }
 }
