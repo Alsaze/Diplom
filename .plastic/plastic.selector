@@ -1,0 +1,4 @@
+repository "Diplom@Alsaze@cloud"
+  path "/"
+    br "/main"
+    co "/main"
