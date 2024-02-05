@@ -1,2 +1,1 @@
-Developing a diploma for my college studies.
-Develop Unity poligon and dron control
+I'm developing a college degree. I'm developing Unity polygon and drone management
