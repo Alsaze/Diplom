@@ -12,10 +12,12 @@ public class DroneMovment : MonoBehaviour
     
     private Rigidbody _rb;
     private Controls _controls;
+    private NetworkWithPython _networkScript;
 
     private void Awake()
     {
         _rb = GetComponent<Rigidbody>();
+        _networkScript = GetComponent<NetworkWithPython>();
         _controls = new Controls();
     }
 
@@ -31,15 +33,14 @@ public class DroneMovment : MonoBehaviour
 
     private void FixedUpdate()
     {
-        print($"{LeftStickVector}|||{RightStickVector}");
         var up = transform.up;
         var forward = transform.forward;    
         var right = transform.right;
         
-        var throttle = (LeftStickVector.y + 1f) / 2f;
-        var yaw = LeftStickVector.x;
-        var pitch = RightStickVector.y;
-        var roll = -RightStickVector.x;
+        var throttle = (-_networkScript.leftJoystickInput.y + 1f) / 2f;
+        var yaw = _networkScript.leftJoystickInput.x;
+        var pitch = -_networkScript.rightJoystickInput.y;
+        var roll = -_networkScript.rightJoystickInput.x;
 
         var rcPitch = RateCalculation(pitch, ratePreset.pitchRcRate, ratePreset.pitchSuperRate, ratePreset.pitchExpo);
         var rcYaw = RateCalculation(yaw, ratePreset.yawRcRate, ratePreset.yawSuperRate, ratePreset.yawExpo);

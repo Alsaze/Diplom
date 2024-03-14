@@ -7,38 +7,26 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
-public class MoveObjectWithJoystick : MonoBehaviour
+public class NetworkWithPython : MonoBehaviour
 {
-    
-    
     static Socket listener;
     private CancellationTokenSource source;
     public ManualResetEvent allDone;
-    public Rigidbody objectRigidbody;  // Assuming you have a Rigidbody component attached to the object
-    private Vector2 leftJoystickInput;
-    private Vector2 rightJoystickInput;
+    public Vector2 leftJoystickInput;
+    public Vector2 rightJoystickInput;
 
     public static readonly int PORT = 1755;
     public static readonly int WAITTIME = 1;
 
-    MoveObjectWithJoystick()
+    NetworkWithPython()
     {
         source = new CancellationTokenSource();
         allDone = new ManualResetEvent(false);
     }
 
-    // Start is called before the first frame update
     async void Start()
     {
-        objectRigidbody = GetComponent<Rigidbody>();
         await Task.Run(() => ListenEvents(source.Token));   
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        // Apply joystick input to move the object
-        ApplyJoystickInput();
     }
 
     private void ListenEvents(CancellationToken token)
@@ -75,22 +63,6 @@ public class MoveObjectWithJoystick : MonoBehaviour
             print(e.ToString());
         }
     }
-
-    void ApplyJoystickInput()
-    {
-        // Adjust the speed factors as needed
-        float forwardSpeed = 5.0f;
-        float turnSpeed = 2.0f;
-
-        // Combine left and right joystick input for movement
-        Vector3 movement = new Vector3(leftJoystickInput.x, 0, leftJoystickInput.y) * forwardSpeed;
-        Vector3 turn = new Vector3(0, rightJoystickInput.x, 0) * turnSpeed;
-
-        // Apply combined movement and turn
-        objectRigidbody.velocity = movement;
-        objectRigidbody.angularVelocity = turn;
-        print($"{leftJoystickInput} | {rightJoystickInput}");
-    }
     
     void AcceptCallback(IAsyncResult ar)
     {
@@ -118,7 +90,6 @@ public class MoveObjectWithJoystick : MonoBehaviour
 
             // Parse joystick input and update the vectors
             string content = state.inputCode.ToString();
-            // print($"Read {content.Length} bytes from socket.\n Data : {content}");
             ParseJoystickInput(content);
         }
         else
@@ -141,9 +112,6 @@ public class MoveObjectWithJoystick : MonoBehaviour
 
             leftJoystickInput = new Vector2(leftX, leftY);
             rightJoystickInput = new Vector2(rightX, rightY);
-            
-            print($" pizda {leftX}-{leftY} | {rightX}-{rightY}");
-            print($"{values[0]}|||{values[1]}|||{values[2]}|||{values[3]}");
         }
     }
 
