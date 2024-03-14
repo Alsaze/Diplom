@@ -1,3 +1,4 @@
+using System;
 using MyDrone;
 using UnityEngine;
 
@@ -30,8 +31,9 @@ public class DroneMovment : MonoBehaviour
 
     private void FixedUpdate()
     {
+        print($"{LeftStickVector}|||{RightStickVector}");
         var up = transform.up;
-        var forward = transform.forward;
+        var forward = transform.forward;    
         var right = transform.right;
         
         var throttle = (LeftStickVector.y + 1f) / 2f;
